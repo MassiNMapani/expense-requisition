@@ -1,24 +1,28 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { Fragment, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { documentTypeOptions, departments, projectCodes, projectTechnologies } from '../constants/referenceData';
 import { apiFetch } from '../lib/api';
-import type { ClientPurchaseRequestDraft, DocumentType } from '../types';
+import type { ClientPurchaseRequestDraft, DocumentType, LineItem } from '../types';
 
-const initialLineItem = { activity: '', unitPrice: 0, quantity: 1 };
+const initialLineItem: LineItem = { description: '', unitPrice: 0, quantity: 1 };
 
 const createDefaultDraft = (): ClientPurchaseRequestDraft => ({
   projectName: projectCodes[0]?.name ?? '',
   projectCode: projectCodes[0]?.code ?? '',
   projectTechnology: projectTechnologies[0] ?? '',
   department: departments[0] ?? '',
+  vendorType: 'existing',
+  currency: 'ZMW',
   requestDate: new Date().toISOString().slice(0, 10),
   serviceDescription: '',
   lineItems: [{ ...initialLineItem }],
   documentType: 'quote',
   contractDetails: { validFrom: '', validTo: '', paymentTerms: '' },
   attachments: [],
-  localFiles: []
+  localFiles: [],
+  bankLetterFile: null,
+  tpinCertificateFile: null
 });
 
 export default function RequestFormPage() {
@@ -26,6 +30,11 @@ export default function RequestFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const showProjectFields = useMemo(
+    () => ['Generation and Transmission', 'Transmission and Distribution'].includes(draft.department),
+    [draft.department]
+  );
+  const isNewVendor = draft.vendorType === 'new';
 
   const totalCost = useMemo(
     () =>
@@ -48,10 +57,11 @@ export default function RequestFormPage() {
     }
   }, [draft.documentType]);
 
-  function updateLineItem(index: number, field: 'activity' | 'unitPrice' | 'quantity', value: string) {
+  function updateLineItem(index: number, field: 'description' | 'unitPrice' | 'quantity', value: string) {
     setDraft((prev) => {
       const next = [...prev.lineItems];
-      const parsedValue = field === 'activity' ? value : Number(value) || 0;
+      const isNumericField = field === 'unitPrice' || field === 'quantity';
+      const parsedValue = isNumericField ? Number(value) || 0 : value;
       next[index] = { ...next[index], [field]: parsedValue };
       return { ...prev, lineItems: next };
     });
@@ -59,6 +69,42 @@ export default function RequestFormPage() {
 
   function addLineItem() {
     setDraft((prev) => ({ ...prev, lineItems: [...prev.lineItems, { ...initialLineItem }] }));
+  }
+
+  function departmentNeedsProjectDetails(value: string) {
+    return ['Generation and Transmission', 'Transmission and Distribution'].includes(value);
+  }
+
+  function handleDepartmentChange(value: string) {
+    setDraft((prev) => {
+      const requiresProjectDetails = departmentNeedsProjectDetails(value);
+      if (requiresProjectDetails) {
+        return {
+          ...prev,
+          department: value,
+          projectName: prev.projectName || projectCodes[0]?.name || '',
+          projectCode: prev.projectCode || projectCodes[0]?.code || '',
+          projectTechnology: prev.projectTechnology || projectTechnologies[0] || ''
+        };
+      }
+      return {
+        ...prev,
+        department: value,
+        projectName: '',
+        projectCode: '',
+        projectTechnology: ''
+      };
+    });
+  }
+
+
+  function handleVendorTypeChange(value: 'existing' | 'new') {
+    setDraft((prev) => ({
+      ...prev,
+      vendorType: value,
+      bankLetterFile: value === 'new' ? prev.bankLetterFile : null,
+      tpinCertificateFile: value === 'new' ? prev.tpinCertificateFile : null
+    }));
   }
 
   function handleDocumentTypeChange(value: DocumentType) {
@@ -79,10 +125,19 @@ export default function RequestFormPage() {
 
     try {
       const formData = new FormData();
-      formData.append('projectName', draft.projectName);
-      formData.append('projectCode', draft.projectCode);
-      formData.append('projectTechnology', draft.projectTechnology);
+      if (departmentNeedsProjectDetails(draft.department)) {
+        formData.append('projectName', draft.projectName ?? '');
+        formData.append('projectCode', draft.projectCode ?? '');
+        formData.append('projectTechnology', draft.projectTechnology ?? '');
+      }
+      formData.append('vendorType', draft.vendorType);
+      if (draft.vendorType === 'new' && (!draft.bankLetterFile || !draft.tpinCertificateFile)) {
+        setSubmitting(false);
+        setError('Bank letter and TPIN certificate are required for new vendors.');
+        return;
+      }
       formData.append('department', draft.department);
+      formData.append('currency', draft.currency);
       formData.append('requestDate', draft.requestDate ?? '');
       formData.append('serviceDescription', draft.serviceDescription);
       formData.append('lineItems', JSON.stringify(draft.lineItems));
@@ -91,6 +146,14 @@ export default function RequestFormPage() {
         formData.append('contractDetails', JSON.stringify(draft.contractDetails));
       }
       draft.localFiles.forEach((file) => formData.append('attachments', file));
+      if (draft.vendorType === 'new') {
+        if (draft.bankLetterFile) {
+          formData.append('attachments', draft.bankLetterFile);
+        }
+        if (draft.tpinCertificateFile) {
+          formData.append('attachments', draft.tpinCertificateFile);
+        }
+      }
 
       await apiFetch('/requests', {
         method: 'POST',
@@ -116,40 +179,8 @@ export default function RequestFormPage() {
       <form className="request-form" onSubmit={handleSubmit}>
         <div className="grid two-col">
           <label>
-            Project Code
-            <select
-              value={draft.projectCode}
-              onChange={(event) => {
-                const { value } = event.target;
-                const project = projectCodes.find((p) => p.code === value);
-                setDraft((prev) => ({ ...prev, projectCode: value, projectName: project?.name ?? prev.projectName }));
-              }}
-            >
-              {projectCodes.map((project) => (
-                <option key={project.code} value={project.code}>
-                  {project.code}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Project Technology
-            <select
-              value={draft.projectTechnology}
-              onChange={(event) => setDraft((prev) => ({ ...prev, projectTechnology: event.target.value }))}
-            >
-              {projectTechnologies.map((technology) => (
-                <option key={technology} value={technology}>
-                  {technology}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
             Department
-            <select value={draft.department} onChange={(event) => setDraft((prev) => ({ ...prev, department: event.target.value }))}>
+            <select value={draft.department} onChange={(event) => handleDepartmentChange(event.target.value)}>
               {departments.map((department) => (
                 <option key={department} value={department}>
                   {department}
@@ -162,6 +193,63 @@ export default function RequestFormPage() {
             Date Raised
             <input type="date" value={draft.requestDate} onChange={(event) => setDraft((prev) => ({ ...prev, requestDate: event.target.value }))} />
           </label>
+
+          {showProjectFields && (
+            <>
+              <label>
+                Project Name
+                <select
+                  required={showProjectFields}
+                  value={draft.projectName}
+                  onChange={(event) => {
+                    const { value } = event.target;
+                    const project = projectCodes.find((p) => p.name === value);
+                    setDraft((prev) => ({ ...prev, projectName: value, projectCode: project?.code ?? prev.projectCode }));
+                  }}
+                >
+                  {projectCodes.map((project) => (
+                    <option key={project.code} value={project.name}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Project Code
+                <select
+                  required={showProjectFields}
+                  value={draft.projectCode}
+                  onChange={(event) => {
+                    const { value } = event.target;
+                    const project = projectCodes.find((p) => p.code === value);
+                    setDraft((prev) => ({ ...prev, projectCode: value, projectName: project?.name ?? prev.projectName }));
+                  }}
+                >
+                  {projectCodes.map((project) => (
+                    <option key={project.code} value={project.code}>
+                      {project.code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Project Technology
+                <select
+                  required={showProjectFields}
+                  value={draft.projectTechnology}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, projectTechnology: event.target.value }))}
+                >
+                  {projectTechnologies.map((technology) => (
+                    <option key={technology} value={technology}>
+                      {technology}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
         </div>
 
         <label>
@@ -177,55 +265,82 @@ export default function RequestFormPage() {
         <section className="line-items">
           <div className="section-header">
             <h3>Line Items</h3>
-            <button type="button" className="ghost" onClick={addLineItem}>
-              + Add Item
-            </button>
+          </div>
+          <div className="line-item-currency">
+            <label>
+              Currency
+              <select
+                value={draft.currency}
+                onChange={(event) => setDraft((prev) => ({ ...prev, currency: event.target.value as ClientPurchaseRequestDraft['currency'] }))}
+              >
+                <option value="ZMW">ZMW</option>
+                <option value="USD">USD</option>
+              </select>
+            </label>
           </div>
           <table>
             <thead>
               <tr>
                 <th>#</th>
-                <th>Activity</th>
-                <th>Unit Price (ZMW)</th>
+                <th>Description</th>
+                <th>Unit Price</th>
                 <th>Quantity</th>
                 <th>Cost</th>
               </tr>
             </thead>
             <tbody>
               {draft.lineItems.map((item, index) => (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>
-                    <input
-                      value={item.activity}
-                      onChange={(event) => updateLineItem(index, 'activity', event.target.value)}
-                      placeholder="Meals and drinks"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      min={0}
-                      value={item.unitPrice}
-                      onChange={(event) => updateLineItem(index, 'unitPrice', event.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={(event) => updateLineItem(index, 'quantity', event.target.value)}
-                    />
-                  </td>
-                  <td>{(item.unitPrice * item.quantity).toLocaleString()}</td>
-                </tr>
+                <Fragment key={index}>
+                  <tr>
+                    <td>{index + 1}</td>
+                    <td>
+                      <input
+                        value={item.description}
+                        onChange={(event) => updateLineItem(index, 'description', event.target.value)}
+                        placeholder="Meals and drinks"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={item.unitPrice === 0 ? '' : item.unitPrice}
+                        onChange={(event) => updateLineItem(index, 'unitPrice', event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(event) => updateLineItem(index, 'quantity', event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      {draft.currency} {(item.unitPrice * item.quantity).toLocaleString()}
+                    </td>
+                  </tr>
+                  {index === draft.lineItems.length - 1 && (
+                    <tr className="add-line-row">
+                      <td colSpan={5}>
+                        <button type="button" className="table-action" onClick={addLineItem}>
+                          + Add another line item
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
             <tfoot>
               <tr>
                 <td colSpan={4}>Total</td>
-                <td>{totalCost.toLocaleString()}</td>
+                <td>
+                  {draft.currency} {totalCost.toLocaleString()}
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -233,6 +348,49 @@ export default function RequestFormPage() {
 
         <section>
           <h3>Supporting Documentation</h3>
+          <div className="vendor-type-selector">
+            <p>Vendor Type</p>
+            <div className="vendor-type-options">
+              <label>
+                <input type="radio" name="vendorType" value="existing" checked={draft.vendorType === 'existing'} onChange={() => handleVendorTypeChange('existing')} />
+                Existing vendor
+              </label>
+              <label>
+                <input type="radio" name="vendorType" value="new" checked={draft.vendorType === 'new'} onChange={() => handleVendorTypeChange('new')} />
+                New vendor
+              </label>
+            </div>
+          </div>
+
+          {isNewVendor && (
+            <div className="grid two-col">
+              <label>
+                Bank letter confirming bank details
+                <input
+                  type="file"
+                  required={isNewVendor}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setDraft((prev) => ({ ...prev, bankLetterFile: file }));
+                  }}
+                />
+                {draft.bankLetterFile && <span className="hint">Selected: {draft.bankLetterFile.name}</span>}
+              </label>
+              <label>
+                TPIN certificate
+                <input
+                  type="file"
+                  required={isNewVendor}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setDraft((prev) => ({ ...prev, tpinCertificateFile: file }));
+                  }}
+                />
+                {draft.tpinCertificateFile && <span className="hint">Selected: {draft.tpinCertificateFile.name}</span>}
+              </label>
+            </div>
+          )}
+
           <p className="hint">{supportingDocHint}</p>
 
           <div className="grid two-col">
@@ -254,16 +412,21 @@ export default function RequestFormPage() {
                 multiple
                 onChange={(event) => {
                   const files = event.target.files ? Array.from(event.target.files) : [];
-                  setDraft((prev) => ({
-                    ...prev,
-                    localFiles: files,
-                    attachments: files.map((file, index) => ({
-                      id: `${file.name}-${index}`,
-                      filename: file.name,
-                      mimeType: file.type,
-                      size: file.size
-                    }))
-                  }));
+                  if (files.length === 0) return;
+                  setDraft((prev) => {
+                    const combined = [...prev.localFiles, ...files];
+                    return {
+                      ...prev,
+                      localFiles: combined,
+                      attachments: combined.map((file, index) => ({
+                        id: `${file.name}-${index}`,
+                        filename: file.name,
+                        mimeType: file.type,
+                        size: file.size
+                      }))
+                    };
+                  });
+                  event.target.value = '';
                 }}
               />
             </label>

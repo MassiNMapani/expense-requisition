@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
+const FILE_BASE_URL = import.meta.env.VITE_FILE_BASE_URL ?? API_BASE_URL.replace(/\/api$/, '');
 
 let authToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('expense-auth-token') : null;
 
@@ -48,4 +49,9 @@ async function parseError(response: Response) {
 
 export function getApiBaseUrl() {
   return API_BASE_URL;
+}
+
+export function buildFileUrl(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${FILE_BASE_URL}${normalizedPath}`;
 }

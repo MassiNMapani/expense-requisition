@@ -105,9 +105,83 @@ button.ghost {
   box-shadow: none;
 }
 
+button.ghost.outline {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+button.ghost.outline:hover {
+  background: rgba(92, 44, 28, 0.08);
+}
+
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+button.table-action {
+  background: transparent;
+  box-shadow: none;
+  padding: 0.35rem 0.5rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+button.table-action:hover {
+  text-decoration: underline;
+  background: transparent;
+}
+
+.metric-extra select {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid #f2d3c2;
+  background: #fffaf7;
+  color: var(--primary);
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: #fbeee7;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+
+.modal-panel {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 1.5rem;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.modal-body h4 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .page-content {
@@ -198,6 +272,19 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.line-item-currency {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.line-item-currency label {
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .card-grid {

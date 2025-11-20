@@ -10,4 +10,6 @@ export type ClientPurchaseRequestDraft = PurchaseRequestPayload & {
     mimeType: string;
     size?: number;
   }>;
+  bankLetterFile: File | null;
+  tpinCertificateFile: File | null;
 };

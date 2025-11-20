@@ -12,10 +12,12 @@ export interface LineItemDocument extends LineItem {}
 
 export interface PurchaseRequestDocument extends Document {
   requestNumber: string;
-  projectName: string;
-  projectCode: string;
-  projectTechnology: string;
+  projectName?: string;
+  projectCode?: string;
+  projectTechnology?: string;
   department: string;
+  vendorType: string;
+  currency: string;
   requesterId: string;
   requesterRole: UserRole;
   requestedAt: Date;
@@ -51,7 +53,7 @@ export interface PurchaseRequestDocument extends Document {
 
 const lineItemSchema = new Schema<LineItemDocument>(
   {
-    activity: { type: String, required: true },
+    description: { type: String, required: true },
     unitPrice: { type: Number, required: true },
     quantity: { type: Number, required: true }
   },
@@ -96,10 +98,12 @@ const approvalHistorySchema = new Schema(
 const purchaseRequestSchema = new Schema<PurchaseRequestDocument>(
   {
     requestNumber: { type: String, required: true, unique: true },
-    projectName: { type: String, required: true },
-    projectCode: { type: String, required: true },
-    projectTechnology: { type: String, required: true },
+    projectName: { type: String },
+    projectCode: { type: String },
+    projectTechnology: { type: String },
     department: { type: String, required: true },
+    vendorType: { type: String, required: true, enum: ['existing', 'new'] },
+    currency: { type: String, required: true, enum: ['ZMW', 'USD'] },
     requesterId: { type: String, required: true },
     requesterRole: { type: String, required: true },
     requestedAt: { type: Date, default: Date.now },

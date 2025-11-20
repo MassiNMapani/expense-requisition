@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiFetch } from '../lib/api';
+import { apiFetch, buildFileUrl } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import type { PurchaseRequest, RequestStatus, UserRole } from '../types';
+import type { PurchaseRequest, RequestStatus } from '../types';
+import { getRequestObjectId, type ExtendedPurchaseRequest } from '../utils/requestId';
+import { canRoleApprove } from '../utils/approvals';
 
 const statusOrder: RequestStatus[] = ['submitted', 'hod_review', 'cfo_review', 'ceo_review', 'accounting_processing', 'bank_loaded'];
 
@@ -36,10 +38,15 @@ export default function RequestsPage() {
   useEffect(() => {
     const initialSelections: Record<string, string[]> = {};
     requests.forEach((request) => {
-      initialSelections[request.id] = request.accountingSteps?.filter((step) => step.completed).map((step) => step.id) ?? [];
+      const reqId = requestIdentifier(request);
+      initialSelections[reqId] = request.accountingSteps?.filter((step) => step.completed).map((step) => step.id) ?? [];
     });
     setProcessingSelections(initialSelections);
   }, [requests]);
+
+  const requestIdentifier = (request: PurchaseRequest): string => {
+    return getRequestObjectId(request as ExtendedPurchaseRequest) || request.requestNumber;
+  };
 
   async function handleDecision(requestId: string, decision: 'approved' | 'rejected') {
     if (decision === 'rejected' && !(comments[requestId] ?? '').trim()) {
@@ -116,14 +123,39 @@ export default function RequestsPage() {
         <p className="hint">No active requests.</p>
       ) : (
         <div className="card-grid">
-          {grouped.active.map((request) => (
-            <article key={request.id} className="card">
-              <header>
-                <h3>{request.projectName}</h3>
-                <p>{request.requestNumber}</p>
-              </header>
-              <p className="amount">ZMW {calculateTotal(request).toLocaleString()}</p>
-              <p className="status">Current stage: {formatStatus(request.status)}</p>
+          {grouped.active.map((request) => {
+            const title = request.projectName ?? `${request.department} Request`;
+            const requestId = requestIdentifier(request);
+            return (
+              <article key={requestId} className="card">
+                <header>
+                  <h3>{title}</h3>
+                  <p>{request.requestNumber}</p>
+                  <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
+                </header>
+                <p className="amount">
+                  {request.currency} {calculateTotal(request).toLocaleString()}
+                </p>
+                <p className="status">Current stage: {formatStatus(request.status)}</p>
+                {request.attachments.length > 0 && (
+                  <div className="attachment-list">
+                    <p className="hint">Attachments</p>
+                    <ul>
+                      {request.attachments.map((attachment) => (
+                        <li key={attachment.id}>
+                          <a
+                            href={buildFileUrl(`/uploads/${attachment.filename}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={attachment.originalName ?? attachment.filename}
+                          >
+                            {attachment.originalName ?? attachment.filename}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
               <ol className="status-track">
                 {statusOrder.map((status) => {
@@ -137,25 +169,25 @@ export default function RequestsPage() {
                 })}
               </ol>
 
-              {user && canApprove(request, user.role) && (
+              {user && canRoleApprove(request, user.role) && (
                 <div className="approval-actions">
                   <textarea
                     rows={2}
                     placeholder="Add context for approvers..."
-                    value={comments[request.id] ?? ''}
-                    onChange={(event) => setComments((prev) => ({ ...prev, [request.id]: event.target.value }))}
+                    value={comments[requestId] ?? ''}
+                    onChange={(event) => setComments((prev) => ({ ...prev, [requestId]: event.target.value }))}
                   />
                   <div className="actions-row">
-                    <button type="button" disabled={actionLoading === `${request.id}-approved`} onClick={() => handleDecision(request.id, 'approved')}>
-                      {actionLoading === `${request.id}-approved` ? 'Saving...' : 'Approve'}
+                    <button type="button" disabled={actionLoading === `${requestId}-approved`} onClick={() => handleDecision(requestId, 'approved')}>
+                      {actionLoading === `${requestId}-approved` ? 'Saving...' : 'Approve'}
                     </button>
                     <button
                       type="button"
                       className="ghost"
-                      disabled={actionLoading === `${request.id}-rejected`}
-                      onClick={() => handleDecision(request.id, 'rejected')}
+                      disabled={actionLoading === `${requestId}-rejected`}
+                      onClick={() => handleDecision(requestId, 'rejected')}
                     >
-                      {actionLoading === `${request.id}-rejected` ? 'Rejecting...' : 'Reject'}
+                      {actionLoading === `${requestId}-rejected` ? 'Rejecting...' : 'Reject'}
                     </button>
                   </div>
                 </div>
@@ -167,19 +199,20 @@ export default function RequestsPage() {
                     <label key={step.id} className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={(processingSelections[request.id] ?? []).includes(step.id)}
-                        onChange={(event) => toggleStep(request.id, step.id, event.target.checked)}
+                        checked={(processingSelections[requestId] ?? []).includes(step.id)}
+                        onChange={(event) => toggleStep(requestId, step.id, event.target.checked)}
                       />
                       {step.label}
                     </label>
                   ))}
-                  <button type="button" onClick={() => handleProcessingSave(request.id)} disabled={processingLoading === request.id}>
-                    {processingLoading === request.id ? 'Updating...' : 'Save processing'}
+                  <button type="button" onClick={() => handleProcessingSave(requestId)} disabled={processingLoading === requestId}>
+                    {processingLoading === requestId ? 'Updating...' : 'Save processing'}
                   </button>
                 </div>
               )}
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -201,7 +234,7 @@ export default function RequestsPage() {
               </tr>
             )}
             {grouped.finished.map((request) => (
-              <tr key={request.id}>
+              <tr key={requestIdentifier(request)}>
                 <td>{request.requestNumber}</td>
                 <td>{request.serviceDescription}</td>
                 <td>{new Date(request.requestedAt).toLocaleDateString()}</td>
@@ -223,17 +256,4 @@ function calculateTotal(request: PurchaseRequest) {
 
 function formatStatus(status: RequestStatus) {
   return status.replaceAll('_', ' ');
-}
-
-function canApprove(request: PurchaseRequest, role: UserRole) {
-  if (role === 'head_of_department') {
-    return request.status === 'hod_review';
-  }
-  if (role === 'chief_finance_officer' || role === 'super_user') {
-    return request.status === 'cfo_review';
-  }
-  if (role === 'chief_executive_officer') {
-    return request.status === 'ceo_review';
-  }
-  return false;
 }

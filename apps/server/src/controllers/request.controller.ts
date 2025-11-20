@@ -6,6 +6,9 @@ import {
   RequestStatuses,
   Roles,
   accountingChecklistByDocument,
+  departmentRequiresProjectDetails,
+  Currencies,
+  VendorTypes,
   type DocumentType,
   type RequestStatus,
   type UserRole
@@ -60,15 +63,31 @@ export async function createRequest(req: Request, res: Response) {
       projectCode,
       projectTechnology,
       department,
+      vendorType,
       serviceDescription,
+      currency,
       lineItems: lineItemsRaw,
       documentType,
       contractDetails: contractDetailsRaw,
       requestDate
     } = req.body;
 
-    if (!projectName || !projectCode || !projectTechnology || !department || !serviceDescription || !lineItemsRaw || !documentType) {
+    if (!department || !vendorType || !currency || !serviceDescription || !lineItemsRaw || !documentType) {
       return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    if (!VendorTypes.includes(vendorType)) {
+      return res.status(400).json({ message: 'Invalid vendor type' });
+    }
+
+    if (!Currencies.includes(currency)) {
+      return res.status(400).json({ message: 'Invalid currency' });
+    }
+
+    const requiresProjectDetails = departmentRequiresProjectDetails(department);
+
+    if (requiresProjectDetails && (!projectName || !projectCode || !projectTechnology)) {
+      return res.status(400).json({ message: 'Project details are required for this department' });
     }
 
     const lineItems = JSON.parse(lineItemsRaw);
@@ -83,13 +102,20 @@ export async function createRequest(req: Request, res: Response) {
 
     const typedDocumentType = documentType as DocumentType;
 
-    const normalizedLineItems = lineItems.map((item: { activity: string; unitPrice: number; quantity: number }) => ({
-      activity: item.activity,
+    const normalizedLineItems = lineItems.map((item: { description: string; unitPrice: number; quantity: number }) => ({
+      description: item.description,
       unitPrice: Number(item.unitPrice),
       quantity: Number(item.quantity)
     }));
 
-    if (normalizedLineItems.some((item) => !item.activity || Number.isNaN(item.unitPrice) || Number.isNaN(item.quantity))) {
+    if (
+      normalizedLineItems.some(
+        (item) =>
+          !item.description ||
+          Number.isNaN(item.unitPrice) ||
+          Number.isNaN(item.quantity)
+      )
+    ) {
       return res.status(400).json({ message: 'Invalid line item values' });
     }
 
@@ -108,12 +134,20 @@ export async function createRequest(req: Request, res: Response) {
 
     const initialStatus = getInitialStatus(req.user.role);
 
+    const projectDetails = requiresProjectDetails
+      ? {
+          projectName: projectName as string,
+          projectCode: projectCode as string,
+          projectTechnology: projectTechnology as string
+        }
+      : {};
+
     const request = await PurchaseRequestModel.create({
       requestNumber: `PR-${uuidv4()}`,
-      projectName,
-      projectCode,
-      projectTechnology,
+      ...projectDetails,
       department,
+      vendorType,
+      currency,
       requesterId: req.user.id,
       requesterRole: req.user.role,
       requestedAt: requestDate ? new Date(requestDate) : new Date(),
