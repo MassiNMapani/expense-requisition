@@ -84,15 +84,49 @@ export async function createRequest(req: Request, res: Response) {
       return res.status(400).json({ message: 'Invalid currency' });
     }
 
-    const requiresProjectDetails = departmentRequiresProjectDetails(department);
+    const allowedDepartments: string[] = [
+      req.user.departmentId,
+      'Generation and Transmission',
+      'Transmission and Distribution'
+    ].filter(Boolean) as string[];
+
+    const enforcedDepartment = (department?.trim() || req.user.departmentId)?.trim();
+    const normalizedDepartment = enforcedDepartment?.toLowerCase();
+    const allowedNormalized = allowedDepartments
+      .map((dept) => dept.trim().toLowerCase())
+      .filter((dept) => dept.length > 0);
+
+    if (req.user.role === Roles.REQUESTOR) {
+      if (!req.user.departmentId) {
+        return res.status(400).json({ message: 'Requestor department not configured' });
+      }
+
+      if (!enforcedDepartment || !allowedNormalized.includes(normalizedDepartment)) {
+        return res.status(400).json({ message: 'Requestors can only submit from allowed departments' });
+      }
+    }
+
+    const requiresProjectDetails = departmentRequiresProjectDetails(enforcedDepartment);
 
     if (requiresProjectDetails && (!projectName || !projectCode || !projectTechnology)) {
       return res.status(400).json({ message: 'Project details are required for this department' });
     }
 
-    const lineItems = JSON.parse(lineItemsRaw);
+    let parsedLineItems: { description: string; unitPrice: number; quantity: number }[];
 
-    if (!Array.isArray(lineItems) || lineItems.length === 0) {
+    if (typeof lineItemsRaw === 'string') {
+      try {
+        parsedLineItems = JSON.parse(lineItemsRaw);
+      } catch (error) {
+        return res.status(400).json({ message: 'Unable to read line items payload' });
+      }
+    } else if (Array.isArray(lineItemsRaw)) {
+      parsedLineItems = lineItemsRaw;
+    } else {
+      return res.status(400).json({ message: 'Line items are required' });
+    }
+
+    if (!Array.isArray(parsedLineItems) || parsedLineItems.length === 0) {
       return res.status(400).json({ message: 'At least one line item is required' });
     }
 
@@ -102,21 +136,25 @@ export async function createRequest(req: Request, res: Response) {
 
     const typedDocumentType = documentType as DocumentType;
 
-    const normalizedLineItems = lineItems.map((item: { description: string; unitPrice: number; quantity: number }) => ({
-      description: item.description,
-      unitPrice: Number(item.unitPrice),
-      quantity: Number(item.quantity)
-    }));
+    const normalizedLineItems = parsedLineItems.map(
+      (item: { description: string; unitPrice: number; quantity: number }) => ({
+        description: (item.description ?? '').trim(),
+        unitPrice: Number(item.unitPrice),
+        quantity: Number(item.quantity)
+      })
+    );
 
     if (
       normalizedLineItems.some(
         (item) =>
           !item.description ||
           Number.isNaN(item.unitPrice) ||
-          Number.isNaN(item.quantity)
+          Number.isNaN(item.quantity) ||
+          item.unitPrice < 0 ||
+          item.quantity < 0
       )
     ) {
-      return res.status(400).json({ message: 'Invalid line item values' });
+      return res.status(400).json({ message: 'Invalid line item values. Unit price and quantity cannot be negative.' });
     }
 
     const parsedContract = contractDetailsRaw ? JSON.parse(contractDetailsRaw) : undefined;
@@ -143,9 +181,8 @@ export async function createRequest(req: Request, res: Response) {
       : {};
 
     const request = await PurchaseRequestModel.create({
-      requestNumber: `PR-${uuidv4()}`,
       ...projectDetails,
-      department,
+      department: enforcedDepartment,
       vendorType,
       currency,
       requesterId: req.user.id,
@@ -185,7 +222,10 @@ export async function listRequests(req: Request, res: Response) {
 
   switch (req.user.role) {
     case Roles.REQUESTOR:
-      query.requesterId = req.user.id;
+      query.$or = [{ requesterId: req.user.id }];
+      if (req.user.departmentId) {
+        query.$or.push({ department: req.user.departmentId });
+      }
       break;
     case Roles.HOD:
       if (req.user.departmentId) {

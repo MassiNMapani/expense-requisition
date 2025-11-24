@@ -16,6 +16,7 @@ export default function RequestsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [processingSelections, setProcessingSelections] = useState<Record<string, string[]>>({});
   const [processingLoading, setProcessingLoading] = useState<string | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -105,6 +106,21 @@ export default function RequestsPage() {
     return { active, finished };
   }, [requests]);
 
+  useEffect(() => {
+    if (grouped.active.length > 0 && !selectedRequestId) {
+      setSelectedRequestId(requestIdentifier(grouped.active[0]));
+    }
+
+    if (grouped.active.length === 0) {
+      setSelectedRequestId(null);
+    }
+  }, [grouped.active, selectedRequestId]);
+
+  const selectedRequest = useMemo(
+    () => grouped.active.find((request) => requestIdentifier(request) === selectedRequestId) ?? null,
+    [grouped.active, selectedRequestId]
+  );
+
   if (loading) {
     return <div className="page-loading">Loading requests...</div>;
   }
@@ -112,125 +128,202 @@ export default function RequestsPage() {
   return (
     <section>
       <header>
-        <h2>Approval Pipeline</h2>
-        <p>Track the lifecycle of every purchase request across all approvers.</p>
+        <h2>APPROVAL PIPELINE</h2>
+        <p>TRACK THE LIFECYCLE OF EVERY PURCHASE REQUEST ACROSS ALL APPROVERS.</p>
       </header>
 
       {error && <p className="error-text">{error}</p>}
 
-      <h3 className="section-title">My Active Requests</h3>
-      {grouped.active.length === 0 ? (
-        <p className="hint">No active requests.</p>
-      ) : (
-        <div className="card-grid">
-          {grouped.active.map((request) => {
-            const title = request.projectName ?? `${request.department} Request`;
-            const requestId = requestIdentifier(request);
-            return (
-              <article key={requestId} className="card">
-                <header>
-                  <h3>{title}</h3>
-                  <p>{request.requestNumber}</p>
-                  <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
-                </header>
-                <p className="amount">
-                  {request.currency} {calculateTotal(request).toLocaleString()}
-                </p>
-                <p className="status">Current stage: {formatStatus(request.status)}</p>
-                {request.attachments.length > 0 && (
-                  <div className="attachment-list">
-                    <p className="hint">Attachments</p>
-                    <ul>
-                      {request.attachments.map((attachment) => (
-                        <li key={attachment.id}>
-                          <a
-                            href={buildFileUrl(`/uploads/${attachment.filename}`)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={attachment.originalName ?? attachment.filename}
-                          >
-                            {attachment.originalName ?? attachment.filename}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-              <ol className="status-track">
-                {statusOrder.map((status) => {
-                  const position = statusOrder.indexOf(status);
-                  const current = Math.max(statusOrder.indexOf(request.status), 0);
+      <div className="table-section">
+        <h3 className="section-title">MY ACTIVE REQUESTS</h3>
+        {grouped.active.length === 0 ? (
+          <p className="hint uppercase-text">NO ACTIVE REQUESTS.</p>
+        ) : (
+          <>
+            <table className="request-summary-table">
+              <thead>
+                <tr>
+                  <th>NUMBER</th>
+                  <th>DESCRIPTION</th>
+                  <th>DEPARTMENT</th>
+                  <th>AMOUNT</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped.active.map((request) => {
+                  const title = request.projectName ?? `${request.department} Request`;
+                  const requestId = requestIdentifier(request);
                   return (
-                    <li key={status} className={position <= current ? 'complete' : ''}>
-                      {formatStatus(status)}
-                    </li>
+                    <tr
+                      key={requestId}
+                      className={`clickable-row ${requestId === selectedRequestId ? 'selected' : ''}`}
+                      onClick={() => setSelectedRequestId(requestId)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedRequestId(requestId);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <td>{request.requestNumber}</td>
+                      <td>{title}</td>
+                      <td>{request.department}</td>
+                      <td>
+                        {request.currency} {calculateTotal(request).toLocaleString()}
+                      </td>
+                      <td>{formatStatus(request.status)}</td>
+                    </tr>
                   );
                 })}
-              </ol>
+              </tbody>
+            </table>
 
-              {user && canRoleApprove(request, user.role) && (
-                <div className="approval-actions">
-                  <textarea
-                    rows={2}
-                    placeholder="Add context for approvers..."
-                    value={comments[requestId] ?? ''}
-                    onChange={(event) => setComments((prev) => ({ ...prev, [requestId]: event.target.value }))}
-                  />
-                  <div className="actions-row">
-                    <button type="button" disabled={actionLoading === `${requestId}-approved`} onClick={() => handleDecision(requestId, 'approved')}>
-                      {actionLoading === `${requestId}-approved` ? 'Saving...' : 'Approve'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost"
-                      disabled={actionLoading === `${requestId}-rejected`}
-                      onClick={() => handleDecision(requestId, 'rejected')}
-                    >
-                      {actionLoading === `${requestId}-rejected` ? 'Rejecting...' : 'Reject'}
-                    </button>
-                  </div>
-                </div>
+            <div className="request-detail-panel">
+              {selectedRequest ? (
+                (() => {
+                  const title = selectedRequest.projectName ?? `${selectedRequest.department} Request`;
+                  const requestId = requestIdentifier(selectedRequest);
+                  return (
+                    <>
+                      <div className="detail-header">
+                        <div>
+                          <p className="hint">REQUEST TITLE</p>
+                          <h3>{title}</h3>
+                          <p className="hint">VENDOR</p>
+                          <p className="detail-text">{selectedRequest.vendorType === 'new' ? 'NEW' : 'EXISTING'}</p>
+                        </div>
+                        <div className="detail-meta">
+                          <p className="hint">REQUEST NUMBER</p>
+                          <p className="detail-number">{selectedRequest.requestNumber}</p>
+                          <p className="hint">CURRENT STAGE</p>
+                          <p className="status-text">{formatStatus(selectedRequest.status)}</p>
+                        </div>
+                      </div>
+
+                      <div className="detail-grid">
+                        <div>
+                          <p className="hint">DEPARTMENT</p>
+                          <p className="detail-text">{selectedRequest.department}</p>
+                        </div>
+                        <div>
+                          <p className="hint">REQUESTED ON</p>
+                          <p className="detail-text">{new Date(selectedRequest.requestedAt).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="hint">TOTAL</p>
+                          <p className="detail-text">
+                            {selectedRequest.currency} {calculateTotal(selectedRequest).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="hint">STATUS JOURNEY</p>
+                      <ol className="status-track">
+                        {statusOrder.map((status) => {
+                          const position = statusOrder.indexOf(status);
+                          const current = Math.max(statusOrder.indexOf(selectedRequest.status), 0);
+                          return (
+                            <li key={status} className={position <= current ? 'complete' : ''}>
+                              {formatStatus(status)}
+                            </li>
+                          );
+                        })}
+                      </ol>
+
+                      {selectedRequest.attachments.length > 0 && (
+                        <div className="attachment-list">
+                          <p className="hint">ATTACHMENTS</p>
+                          <ul>
+                            {selectedRequest.attachments.map((attachment) => (
+                              <li key={attachment.id}>
+                                <a
+                                  href={buildFileUrl(`/uploads/${attachment.filename}`)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download={attachment.originalName ?? attachment.filename}
+                                >
+                                  {attachment.originalName ?? attachment.filename}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {user && canRoleApprove(selectedRequest, user.role) && (
+                        <div className="approval-actions">
+                          <textarea
+                            rows={3}
+                            placeholder="ADD CONTEXT FOR APPROVERS..."
+                            value={comments[requestId] ?? ''}
+                            onChange={(event) => setComments((prev) => ({ ...prev, [requestId]: event.target.value }))}
+                          />
+                          <div className="actions-row">
+                            <button
+                              type="button"
+                              disabled={actionLoading === `${requestId}-approved`}
+                              onClick={() => handleDecision(requestId, 'approved')}
+                            >
+                              {actionLoading === `${requestId}-approved` ? 'SAVING...' : 'APPROVE'}
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost outline"
+                              disabled={actionLoading === `${requestId}-rejected`}
+                              onClick={() => handleDecision(requestId, 'rejected')}
+                            >
+                              {actionLoading === `${requestId}-rejected` ? 'REJECTING...' : 'REJECT'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {user?.role === 'accounting_analyst' && selectedRequest.accountingSteps.length > 0 && (
+                        <div className="accounting-steps">
+                          {selectedRequest.accountingSteps.map((step) => (
+                            <label key={step.id} className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={(processingSelections[requestId] ?? []).includes(step.id)}
+                                onChange={(event) => toggleStep(requestId, step.id, event.target.checked)}
+                              />
+                              {step.label}
+                            </label>
+                          ))}
+                          <button type="button" onClick={() => handleProcessingSave(requestId)} disabled={processingLoading === requestId}>
+                            {processingLoading === requestId ? 'UPDATING...' : 'SAVE PROCESSING'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
+              ) : (
+                <p className="hint uppercase-text">SELECT A REQUEST TO VIEW DETAILS.</p>
               )}
+            </div>
+          </>
+        )}
+      </div>
 
-              {user?.role === 'accounting_analyst' && request.accountingSteps.length > 0 && (
-                <div className="accounting-steps">
-                  {request.accountingSteps.map((step) => (
-                    <label key={step.id} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={(processingSelections[requestId] ?? []).includes(step.id)}
-                        onChange={(event) => toggleStep(requestId, step.id, event.target.checked)}
-                      />
-                      {step.label}
-                    </label>
-                  ))}
-                  <button type="button" onClick={() => handleProcessingSave(requestId)} disabled={processingLoading === requestId}>
-                    {processingLoading === requestId ? 'Updating...' : 'Save processing'}
-                  </button>
-                </div>
-              )}
-              </article>
-            );
-          })}
-        </div>
-      )}
-
-      <h3 className="section-title">My Past Requests</h3>
       <div className="table-section">
+        <h3 className="section-title">MY PAST REQUESTS</h3>
         <table>
           <thead>
             <tr>
-              <th>Number</th>
-              <th>Description</th>
-              <th>Requested On</th>
-              <th>Status</th>
+              <th>NUMBER</th>
+              <th>DESCRIPTION</th>
+              <th>REQUESTED ON</th>
+              <th>STATUS</th>
             </tr>
           </thead>
           <tbody>
             {grouped.finished.length === 0 && (
               <tr>
-                <td colSpan={4}>No completed requests.</td>
+                <td colSpan={4}>NO COMPLETED REQUESTS.</td>
               </tr>
             )}
             {grouped.finished.map((request) => (
@@ -255,5 +348,5 @@ function calculateTotal(request: PurchaseRequest) {
 }
 
 function formatStatus(status: RequestStatus) {
-  return status.replaceAll('_', ' ');
+  return status.replaceAll('_', ' ').toUpperCase();
 }

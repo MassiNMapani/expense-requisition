@@ -378,9 +378,66 @@ textarea {
   box-shadow: 0 20px 45px rgba(60, 24, 8, 0.12);
 }
 
+.request-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  box-shadow: inset 0 0 0 1px #f4dbcf;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.request-summary-table th,
+.request-summary-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #f4dbcf;
+  text-align: left;
+}
+
+.request-summary-table thead {
+  background: #fbeee7;
+}
+
+.request-summary-table tr.selected {
+  background: #fbe6dc;
+}
+
+.request-detail-panel {
+  margin-top: 1.5rem;
+  background: #fffaf7;
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: inset 0 0 0 1px #f4dbcf;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.detail-number,
+.detail-text,
+.status-text {
+  margin: 0.35rem 0 0;
+  font-weight: 600;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
 .hint {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.uppercase-text {
+  text-transform: uppercase;
 }
 
 .error-text {

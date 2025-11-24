@@ -140,7 +140,7 @@ purchaseRequestSchema.pre('save', async function (next) {
   if (!this.requestNumber) {
     try {
       const seq = await getNextSequence('purchaseRequest');
-      this.requestNumber = `PR-${String(seq).padStart(6, '0')}`;
+      this.requestNumber = `PR-${String(seq).padStart(5, '0')}`;
       next();
     } catch (err) {
       // cast err so it matches the expected type for next()
