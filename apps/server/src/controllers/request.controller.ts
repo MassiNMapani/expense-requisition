@@ -103,9 +103,21 @@ export async function createRequest(req: Request, res: Response) {
       return res.status(400).json({ message: 'Project details are required for this department' });
     }
 
-    const lineItems = JSON.parse(lineItemsRaw);
+    let parsedLineItems: { description: string; unitPrice: number; quantity: number }[];
 
-    if (!Array.isArray(lineItems) || lineItems.length === 0) {
+    if (typeof lineItemsRaw === 'string') {
+      try {
+        parsedLineItems = JSON.parse(lineItemsRaw);
+      } catch (error) {
+        return res.status(400).json({ message: 'Unable to read line items payload' });
+      }
+    } else if (Array.isArray(lineItemsRaw)) {
+      parsedLineItems = lineItemsRaw;
+    } else {
+      return res.status(400).json({ message: 'Line items are required' });
+    }
+
+    if (!Array.isArray(parsedLineItems) || parsedLineItems.length === 0) {
       return res.status(400).json({ message: 'At least one line item is required' });
     }
 
@@ -115,7 +127,7 @@ export async function createRequest(req: Request, res: Response) {
 
     const typedDocumentType = documentType as DocumentType;
 
-    const normalizedLineItems = lineItems.map((item: { description: string; unitPrice: number; quantity: number }) => ({
+    const normalizedLineItems = parsedLineItems.map((item: { description: string; unitPrice: number; quantity: number }) => ({
       description: item.description,
       unitPrice: Number(item.unitPrice),
       quantity: Number(item.quantity)
