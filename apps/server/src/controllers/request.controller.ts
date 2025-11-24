@@ -84,7 +84,20 @@ export async function createRequest(req: Request, res: Response) {
       return res.status(400).json({ message: 'Invalid currency' });
     }
 
-    const requiresProjectDetails = departmentRequiresProjectDetails(department);
+    const allowedDepartments: string[] = ['Generation and Transmission', 'Transmission and Distribution'];
+    const enforcedDepartment = req.user.departmentId ?? department;
+
+    if (req.user.role === Roles.REQUESTOR) {
+      if (!req.user.departmentId) {
+        return res.status(400).json({ message: 'Requestor department not configured' });
+      }
+
+      if (!allowedDepartments.includes(req.user.departmentId)) {
+        return res.status(400).json({ message: 'Requestors can only submit from allowed departments' });
+      }
+    }
+
+    const requiresProjectDetails = departmentRequiresProjectDetails(enforcedDepartment);
 
     if (requiresProjectDetails && (!projectName || !projectCode || !projectTechnology)) {
       return res.status(400).json({ message: 'Project details are required for this department' });
@@ -143,9 +156,8 @@ export async function createRequest(req: Request, res: Response) {
       : {};
 
     const request = await PurchaseRequestModel.create({
-      requestNumber: `PR-${uuidv4()}`,
       ...projectDetails,
-      department,
+      department: enforcedDepartment,
       vendorType,
       currency,
       requesterId: req.user.id,
@@ -186,6 +198,9 @@ export async function listRequests(req: Request, res: Response) {
   switch (req.user.role) {
     case Roles.REQUESTOR:
       query.requesterId = req.user.id;
+      if (req.user.departmentId) {
+        query.department = req.user.departmentId;
+      }
       break;
     case Roles.HOD:
       if (req.user.departmentId) {
