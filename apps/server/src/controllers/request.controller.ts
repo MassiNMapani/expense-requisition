@@ -84,7 +84,27 @@ export async function createRequest(req: Request, res: Response) {
       return res.status(400).json({ message: 'Invalid currency' });
     }
 
-    const requiresProjectDetails = departmentRequiresProjectDetails(department);
+    const allowedDepartments: string[] = [
+      req.user.departmentId,
+      'Generation and Transmission',
+      'Transmission and Distribution'
+    ].filter(Boolean) as string[];
+
+    const enforcedDepartment = department?.trim() ?? req.user.departmentId;
+    const normalizedDepartment = enforcedDepartment?.toLowerCase();
+    const allowedNormalized = allowedDepartments.map((dept) => dept.toLowerCase());
+
+    if (req.user.role === Roles.REQUESTOR) {
+      if (!req.user.departmentId) {
+        return res.status(400).json({ message: 'Requestor department not configured' });
+      }
+
+      if (!enforcedDepartment || !allowedNormalized.includes(normalizedDepartment)) {
+        return res.status(400).json({ message: 'Requestors can only submit from allowed departments' });
+      }
+    }
+
+    const requiresProjectDetails = departmentRequiresProjectDetails(enforcedDepartment);
 
     if (requiresProjectDetails && (!projectName || !projectCode || !projectTechnology)) {
       return res.status(400).json({ message: 'Project details are required for this department' });
@@ -143,9 +163,8 @@ export async function createRequest(req: Request, res: Response) {
       : {};
 
     const request = await PurchaseRequestModel.create({
-      requestNumber: `PR-${uuidv4()}`,
       ...projectDetails,
-      department,
+      department: enforcedDepartment,
       vendorType,
       currency,
       requesterId: req.user.id,
@@ -185,7 +204,10 @@ export async function listRequests(req: Request, res: Response) {
 
   switch (req.user.role) {
     case Roles.REQUESTOR:
-      query.requesterId = req.user.id;
+      query.$or = [{ requesterId: req.user.id }];
+      if (req.user.departmentId) {
+        query.$or.push({ department: req.user.departmentId });
+      }
       break;
     case Roles.HOD:
       if (req.user.departmentId) {
