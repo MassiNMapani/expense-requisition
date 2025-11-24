@@ -49,7 +49,21 @@ export default function DashboardPage() {
       pending.length > 0 ? (pending.reduce((sum, request) => sum + request.lineItems.length, 0) / pending.length).toFixed(1) : '0';
 
     return [
+<<<<<<< HEAD
       { label: 'TOTAL PENDING APPROVALS', value: pending.length.toString() },
+=======
+      { label: 'Total Pending Approvals', value: pending.length.toString() },
+      {
+        label: 'Approved This Month',
+        value: formatCurrencyValue(approvedTotalsThisMonth[approvedThisMonthCurrency] ?? 0, approvedThisMonthCurrency),
+        extra: (
+          <select value={approvedThisMonthCurrency} onChange={(event) => setApprovedThisMonthCurrency(event.target.value as PurchaseRequest['currency'])}>
+            <option value="ZMW">ZMW</option>
+            <option value="USD">USD</option>
+          </select>
+        )
+      },
+>>>>>>> 60dc0fe (changes before doing demo to laura)
       {
         label: 'APPROVED THIS MONTH',
         value: formatCurrencyValue(approvedTotalsThisMonth[approvedThisMonthCurrency] ?? 0, approvedThisMonthCurrency),
@@ -179,6 +193,7 @@ export default function DashboardPage() {
               const commentKey = requestId || request.requestNumber;
               return (
                 <article key={commentKey} className="card">
+<<<<<<< HEAD
                   <header>
                     <h3>{request.projectName ?? `${request.department} Request`}</h3>
                     <p>{request.requestNumber}</p>
@@ -188,6 +203,17 @@ export default function DashboardPage() {
                     {request.currency} {calculateTotal(request).toLocaleString()}
                   </p>
                   <p className="status">CURRENT STAGE: {request.status.replaceAll('_', ' ').toUpperCase()}</p>
+=======
+                <header>
+                  <h3>{request.projectName ?? `${request.department} Request`}</h3>
+                  <p>{request.requestNumber}</p>
+                  <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
+                </header>
+                <p className="amount">
+                  {request.currency} {calculateTotal(request).toLocaleString()}
+                </p>
+                <p className="status">Current stage: {request.status.replaceAll('_', ')')}</p>
+>>>>>>> 60dc0fe (changes before doing demo to laura)
                 {request.attachments.length > 0 && (
                   <div className="attachment-list">
                     <p className="hint">ATTACHMENTS</p>
