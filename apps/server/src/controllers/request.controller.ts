@@ -84,19 +84,15 @@ export async function createRequest(req: Request, res: Response) {
       return res.status(400).json({ message: 'Invalid currency' });
     }
 
-    const allowedDepartments: string[] = [
-      req.user.departmentId,
-      'Generation and Transmission',
-      'Transmission and Distribution'
-    ].filter(Boolean) as string[];
-    const enforcedDepartment = department ?? req.user.departmentId;
+    const allowedDepartments: string[] = ['Generation and Transmission', 'Transmission and Distribution'];
+    const enforcedDepartment = req.user.departmentId ?? department;
 
     if (req.user.role === Roles.REQUESTOR) {
       if (!req.user.departmentId) {
         return res.status(400).json({ message: 'Requestor department not configured' });
       }
 
-      if (!allowedDepartments.includes(enforcedDepartment)) {
+      if (!allowedDepartments.includes(req.user.departmentId)) {
         return res.status(400).json({ message: 'Requestors can only submit from allowed departments' });
       }
     }
@@ -201,9 +197,9 @@ export async function listRequests(req: Request, res: Response) {
 
   switch (req.user.role) {
     case Roles.REQUESTOR:
-      query.$or = [{ requesterId: req.user.id }];
+      query.requesterId = req.user.id;
       if (req.user.departmentId) {
-        query.$or.push({ department: req.user.departmentId });
+        query.department = req.user.departmentId;
       }
       break;
     case Roles.HOD:

@@ -46,16 +46,16 @@ export default function RequestFormPage() {
     [draft.lineItems]
   );
 
-  const requestorDepartments = useMemo(() => {
-    const base = ['Generation and Transmission', 'Transmission and Distribution'];
-    if (user?.departmentId) {
-      return Array.from(new Set([user.departmentId, ...base]));
-    }
-    return base;
-  }, [user?.departmentId]);
+  const requestorDepartments = useMemo(
+    () => ['Generation and Transmission', 'Transmission and Distribution'],
+    []
+  );
 
   const departmentOptions = useMemo(() => {
     if (user?.role === 'requestor') {
+      if (user.departmentId) {
+        return [user.departmentId];
+      }
       return requestorDepartments;
     }
     return departments;
@@ -190,7 +190,11 @@ export default function RequestFormPage() {
         <div className="grid two-col">
           <label>
             Department
-            <select value={draft.department} onChange={(event) => handleDepartmentChange(event.target.value)}>
+            <select
+              value={draft.department}
+              onChange={(event) => handleDepartmentChange(event.target.value)}
+              disabled={user?.role === 'requestor'}
+            >
               {departmentOptions.map((department) => (
                 <option key={department} value={department}>
                   {department}
