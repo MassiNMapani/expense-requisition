@@ -21,6 +21,14 @@ export default function DashboardPage() {
     refresh();
   }, []);
 
+  function formatPrDisplay(raw: string) {
+    const match = raw.match(/PR-(\d+)$/);
+    if (match) return `PR-${match[1].padStart(6, '0')}`;
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (digits.length > 0) return `PR-${digits.slice(-6).padStart(6, '0')}`;
+    return raw;
+  }
+
   async function refresh() {
     try {
       const data = await apiFetch<PurchaseRequest[]>('/requests');
@@ -112,8 +120,8 @@ export default function DashboardPage() {
   return (
     <section>
       <header>
-        <h2>Dashboard</h2>
-        <p>Logged in as {user?.name} ({user?.role.replaceAll('_', ' ')}).</p>
+  <h2>DASHBOARD</h2>
+  <p>LOGGED IN AS {user?.name} ({user?.role.replaceAll('_', ' ')}).</p>
       </header>
 
       {loading && <p className="hint">Loading...</p>}
@@ -122,7 +130,7 @@ export default function DashboardPage() {
       <div className="card-grid">
         {metrics.map((metric) => (
           <article key={metric.label} className="card metric-card">
-            <p className="hint">{metric.label}</p>
+            <p className="hint">{metric.label.toUpperCase()}</p>
             <p className="metric-value">{metric.value}</p>
             {metric.extra && <div className="metric-extra">{metric.extra}</div>}
           </article>
@@ -130,7 +138,7 @@ export default function DashboardPage() {
       </div>
 
       <section className="table-section">
-        <h3>Recent Requests</h3>
+        <h3>RECENT REQUESTS</h3>
         <table>
           <thead>
             <tr>
@@ -146,7 +154,7 @@ export default function DashboardPage() {
                 <td colSpan={4}>No requests yet.</td>
               </tr>
             )}
-            {lastRequests.map((request) => (
+      {lastRequests.map((request) => (
               <tr
                 key={request.id}
                 className="clickable-row"
@@ -160,10 +168,10 @@ export default function DashboardPage() {
                   }
                 }}
               >
-                <td>{request.requestNumber}</td>
+        <td>{formatPrDisplay(request.requestNumber)}</td>
                 <td>{request.serviceDescription}</td>
                 <td>{new Date(request.requestedAt).toLocaleDateString()}</td>
-                <td>{request.status.replaceAll('_', ' ')}</td>
+        <td>{request.status.replaceAll('_', ' ')}</td>
               </tr>
             ))}
           </tbody>
@@ -172,67 +180,27 @@ export default function DashboardPage() {
 
       {pendingApprovals.length > 0 && (
         <section className="table-section">
-          <h3>Pending Approvals</h3>
-          <div className="card-grid">
-            {pendingApprovals.map((request) => {
-              const requestId = getRequestObjectId(request);
-              const commentKey = requestId || request.requestNumber;
-              return (
-                <article key={commentKey} className="card">
-                <header>
-                  <h3>{request.projectName ?? `${request.department} Request`}</h3>
-                  <p>{request.requestNumber}</p>
-                  <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
-                </header>
-                <p className="amount">
-                  {request.currency} {calculateTotal(request).toLocaleString()}
-                </p>
-                <p className="status">Current stage: {request.status.replaceAll('_', ')')}</p>
-                {request.attachments.length > 0 && (
-                  <div className="attachment-list">
-                    <p className="hint">Attachments</p>
-                    <ul>
-                      {request.attachments.map((attachment) => (
-                        <li key={attachment.id}>
-                          <a
-                            href={buildFileUrl(`/uploads/${attachment.filename}`)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={attachment.originalName ?? attachment.filename}
-                          >
-                            {attachment.originalName ?? attachment.filename}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <textarea
-                  rows={2}
-                  placeholder="Add rejection comment..."
-                  value={approvalComments[commentKey] ?? ''}
-                  onChange={(event) => setApprovalComments((prev) => ({ ...prev, [commentKey]: event.target.value }))}
-                />
-                <div className="actions-row">
-                  <button
-                    type="button"
-                    disabled={actionLoading === `${requestId}-approved`}
-                    onClick={() => handleApprovalDecision(request, 'approved')}
-                  >
-                    {actionLoading === `${requestId}-approved` ? 'Saving...' : 'Approve'}
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost outline"
-                    disabled={actionLoading === `${requestId}-rejected`}
-                    onClick={() => handleApprovalDecision(request, 'rejected')}
-                  >
-                    {actionLoading === `${requestId}-rejected` ? 'Rejecting...' : 'Reject'}
-                  </button>
-                </div>
-              </article>
-              );
-            })}
+          <h3>PENDING APPROVALS</h3>
+          <div className="request-list">
+            <ul>
+              {pendingApprovals.map((request) => {
+                const requestId = getRequestObjectId(request) || request.requestNumber;
+                return (
+                  <li key={requestId} className="request-summary">
+                    <button type="button" className="link-like" onClick={() => setSelectedRequest(request)}>
+                      <div className="summary-left">
+                        <strong>{request.projectName ?? `${request.department} Request`}</strong>
+                        <div className="hint">{formatPrDisplay(request.requestNumber)}</div>
+                      </div>
+                      <div className="summary-right">
+                        <div className="amount">{request.currency} {calculateTotal(request).toLocaleString()}</div>
+                        <div className="status">{request.status.replaceAll('_', ' ')}</div>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </section>
       )}
@@ -317,6 +285,33 @@ export default function DashboardPage() {
                     ))}
                   </ul>
                 </>
+              )}
+              {user && canRoleApprove(selectedRequest as ExtendedPurchaseRequest, user.role) && (
+                <div className="approval-actions modal-approval">
+                  <textarea
+                    rows={3}
+                    placeholder="Add rejection comment..."
+                    value={approvalComments[selectedRequest.requestNumber] ?? ''}
+                    onChange={(event) => setApprovalComments((prev) => ({ ...prev, [selectedRequest.requestNumber]: event.target.value }))}
+                  />
+                  <div className="actions-row">
+                    <button
+                      type="button"
+                      disabled={actionLoading === `${selectedRequest.id}-approved`}
+                      onClick={() => handleApprovalDecision(selectedRequest as ExtendedPurchaseRequest, 'approved')}
+                    >
+                      {actionLoading === `${selectedRequest.id}-approved` ? 'Saving...' : 'Approve'}
+                    </button>
+                    <button
+                      type="button"
+                      /* Reject uses primary styling in modal to be visible against the white background */
+                      disabled={actionLoading === `${selectedRequest.id}-rejected`}
+                      onClick={() => handleApprovalDecision(selectedRequest as ExtendedPurchaseRequest, 'rejected')}
+                    >
+                      {actionLoading === `${selectedRequest.id}-rejected` ? 'Rejecting...' : 'Reject'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

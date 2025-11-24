@@ -44,18 +44,7 @@ export default function RequestFormPage() {
     [draft.lineItems]
   );
 
-  const supportingDocHint = useMemo(() => {
-    switch (draft.documentType) {
-      case 'invoice':
-        return 'Invoices trigger accounting checks for SAP upload and bank submission.';
-      case 'quote':
-        return 'Quotes are required for existing vendors and unlock two analyst checkboxes.';
-      case 'contract':
-        return 'Contracts require validity dates and payment terms for analyst review.';
-      default:
-        return '';
-    }
-  }, [draft.documentType]);
+  // supporting doc narration removed per request
 
   function updateLineItem(index: number, field: 'description' | 'unitPrice' | 'quantity', value: string) {
     setDraft((prev) => {
@@ -173,7 +162,6 @@ export default function RequestFormPage() {
     <section>
       <header>
         <h2>Purchase Requisition</h2>
-        <p>Complete the form below. Dropdown values mimic the provided paper form.</p>
       </header>
 
       <form className="request-form" onSubmit={handleSubmit}>
@@ -391,7 +379,7 @@ export default function RequestFormPage() {
             </div>
           )}
 
-          <p className="hint">{supportingDocHint}</p>
+          {/* narration removed per requirements - keep form inputs as before */}
 
           <div className="grid two-col">
             <label>
@@ -442,14 +430,6 @@ export default function RequestFormPage() {
 
           {draft.documentType === 'contract' && (
             <div className="grid two-col">
-              <label>
-                Contract Valid From
-                <input type="date" value={draft.contractDetails?.validFrom} onChange={(event) => updateContract('validFrom', event.target.value)} />
-              </label>
-              <label>
-                Contract Valid To
-                <input type="date" value={draft.contractDetails?.validTo} onChange={(event) => updateContract('validTo', event.target.value)} />
-              </label>
               <label className="full-width">
                 Payment Terms
                 <textarea
