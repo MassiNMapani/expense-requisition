@@ -1,5 +1,6 @@
 import { Schema, model, type Document } from 'mongoose';
 import type { DocumentType, LineItem, RequestStatus, UserRole } from '@expense-requisition/shared';
+import { CounterModel } from './Counter';
 
 export interface AccountingStepDocument {
   id: string;
@@ -122,5 +123,32 @@ const purchaseRequestSchema = new Schema<PurchaseRequestDocument>(
   },
   { timestamps: true }
 );
+
+// helper to get next sequence
+async function getNextSequence(name: string) {
+  const doc = await CounterModel.findOneAndUpdate(
+    { _id: name },
+    { $inc: { seq: 1 } },
+    { upsert: true, new: true }
+  ).exec();
+  return doc.seq;
+}
+
+// add pre-save hook to generate PR number
+// (adjust hook registration to the schema variable used in this file)
+purchaseRequestSchema.pre('save', async function (next) {
+  if (!this.requestNumber) {
+    try {
+      const seq = await getNextSequence('purchaseRequest');
+      this.requestNumber = `PR-${String(seq).padStart(6, '0')}`;
+      next();
+    } catch (err) {
+      // cast err so it matches the expected type for next()
+      next(err as any);
+    }
+  } else {
+    next();
+  }
+});
 
 export const PurchaseRequestModel = model<PurchaseRequestDocument>('PurchaseRequest', purchaseRequestSchema);

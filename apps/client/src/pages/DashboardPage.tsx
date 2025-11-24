@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [approvedCurrency, setApprovedCurrency] = useState<PurchaseRequest['currency']>('ZMW');
   const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
+  const [approvedThisMonthCurrency, setApprovedThisMonthCurrency] = useState<PurchaseRequest['currency']>('ZMW');
 
   useEffect(() => {
     refresh();
@@ -34,13 +35,11 @@ export default function DashboardPage() {
 
   const metrics = useMemo(() => {
     const pending = requests.filter((request) => !['bank_loaded', 'rejected'].includes(request.status));
-    const awaitingCeo = requests.filter((request) => request.status === 'ceo_review');
     const approvedThisMonth = requests.filter((request) => {
       const created = new Date(request.createdAt);
       const today = new Date();
       return request.status === 'bank_loaded' && created.getMonth() === today.getMonth() && created.getFullYear() === today.getFullYear();
     });
-    const ceoTotals = sumTotalsByCurrency(awaitingCeo);
     const approvedTotalsThisMonth = sumTotalsByCurrency(approvedThisMonth);
     const approvedRequests = requests.filter((request) => request.status === 'bank_loaded');
     const approvedTotals = sumTotalsByCurrency(approvedRequests);
@@ -51,8 +50,16 @@ export default function DashboardPage() {
 
     return [
       { label: 'Total Pending Approvals', value: pending.length.toString() },
-      { label: 'Value Awaiting CEO', value: formatCurrencyTotals(ceoTotals) },
-      { label: 'Approved This Month', value: formatCurrencyTotals(approvedTotalsThisMonth) },
+      {
+        label: 'Approved This Month',
+        value: formatCurrencyValue(approvedTotalsThisMonth[approvedThisMonthCurrency] ?? 0, approvedThisMonthCurrency),
+        extra: (
+          <select value={approvedThisMonthCurrency} onChange={(event) => setApprovedThisMonthCurrency(event.target.value as PurchaseRequest['currency'])}>
+            <option value="ZMW">ZMW</option>
+            <option value="USD">USD</option>
+          </select>
+        )
+      },
       {
         label: 'Total amount approved',
         value: formatCurrencyValue(approvedValue, approvedCurrency),
@@ -65,7 +72,7 @@ export default function DashboardPage() {
       },
       { label: 'Average Line Items', value: `${avgLineItems} items` }
     ];
-  }, [requests, approvedCurrency]);
+  }, [requests, approvedCurrency, approvedThisMonthCurrency]);
 
   const lastRequests = useMemo(() => requests.slice(0, 3), [requests]);
   const pendingApprovals = useMemo<ExtendedPurchaseRequest[]>(() => {
@@ -180,7 +187,7 @@ export default function DashboardPage() {
                 <p className="amount">
                   {request.currency} {calculateTotal(request).toLocaleString()}
                 </p>
-                <p className="status">Current stage: {request.status.replaceAll('_', ' ')}</p>
+                <p className="status">Current stage: {request.status.replaceAll('_', ')')}</p>
                 {request.attachments.length > 0 && (
                   <div className="attachment-list">
                     <p className="hint">Attachments</p>
@@ -329,14 +336,6 @@ function sumTotalsByCurrency(requests: PurchaseRequest[]) {
     acc[request.currency] = (acc[request.currency] ?? 0) + total;
     return acc;
   }, {});
-}
-
-function formatCurrencyTotals(totals: Record<string, number>) {
-  const entries = Object.entries(totals).filter(([, amount]) => amount > 0);
-  if (entries.length === 0) {
-    return '0';
-  }
-  return entries.map(([currency, amount]) => `${currency} ${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`).join(' | ');
 }
 
 function formatCurrencyValue(amount: number, currency: string) {
