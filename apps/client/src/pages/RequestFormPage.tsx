@@ -1,9 +1,10 @@
-import { Fragment, useMemo, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { documentTypeOptions, departments, projectCodes, projectTechnologies } from '../constants/referenceData';
 import { apiFetch } from '../lib/api';
 import type { ClientPurchaseRequestDraft, DocumentType, LineItem } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 const initialLineItem: LineItem = { description: '', unitPrice: 0, quantity: 1 };
 
@@ -30,6 +31,7 @@ export default function RequestFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const showProjectFields = useMemo(
     () => ['Generation and Transmission', 'Transmission and Distribution'].includes(draft.department),
     [draft.department]
@@ -44,18 +46,26 @@ export default function RequestFormPage() {
     [draft.lineItems]
   );
 
-  const supportingDocHint = useMemo(() => {
-    switch (draft.documentType) {
-      case 'invoice':
-        return 'Invoices trigger accounting checks for SAP upload and bank submission.';
-      case 'quote':
-        return 'Quotes are required for existing vendors and unlock two analyst checkboxes.';
-      case 'contract':
-        return 'Contracts require validity dates and payment terms for analyst review.';
-      default:
-        return '';
+  const requestorDepartments = useMemo(
+    () => ['Generation and Transmission', 'Transmission and Distribution'],
+    []
+  );
+
+  const departmentOptions = useMemo(() => {
+    if (user?.role === 'requestor') {
+      if (user.departmentId) {
+        return [user.departmentId];
+      }
+      return requestorDepartments;
     }
-  }, [draft.documentType]);
+    return departments;
+  }, [departments, requestorDepartments, user]);
+
+  useEffect(() => {
+    if (user?.departmentId && departmentOptions.includes(user.departmentId)) {
+      handleDepartmentChange(user.departmentId);
+    }
+  }, [departmentOptions, user]);
 
   function updateLineItem(index: number, field: 'description' | 'unitPrice' | 'quantity', value: string) {
     setDraft((prev) => {
@@ -180,8 +190,12 @@ export default function RequestFormPage() {
         <div className="grid two-col">
           <label>
             Department
-            <select value={draft.department} onChange={(event) => handleDepartmentChange(event.target.value)}>
-              {departments.map((department) => (
+            <select
+              value={draft.department}
+              onChange={(event) => handleDepartmentChange(event.target.value)}
+              disabled={user?.role === 'requestor'}
+            >
+              {departmentOptions.map((department) => (
                 <option key={department} value={department}>
                   {department}
                 </option>
@@ -191,7 +205,11 @@ export default function RequestFormPage() {
 
           <label>
             Date Raised
-            <input type="date" value={draft.requestDate} onChange={(event) => setDraft((prev) => ({ ...prev, requestDate: event.target.value }))} />
+            <input
+              type="date"
+              value={draft.requestDate}
+              onChange={(event) => setDraft((prev) => ({ ...prev, requestDate: event.target.value }))}
+            />
           </label>
 
           {showProjectFields && (
@@ -391,8 +409,6 @@ export default function RequestFormPage() {
             </div>
           )}
 
-          <p className="hint">{supportingDocHint}</p>
-
           <div className="grid two-col">
             <label>
               Document Type
@@ -442,14 +458,6 @@ export default function RequestFormPage() {
 
           {draft.documentType === 'contract' && (
             <div className="grid two-col">
-              <label>
-                Contract Valid From
-                <input type="date" value={draft.contractDetails?.validFrom} onChange={(event) => updateContract('validFrom', event.target.value)} />
-              </label>
-              <label>
-                Contract Valid To
-                <input type="date" value={draft.contractDetails?.validTo} onChange={(event) => updateContract('validTo', event.target.value)} />
-              </label>
               <label className="full-width">
                 Payment Terms
                 <textarea

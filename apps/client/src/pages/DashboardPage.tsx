@@ -49,9 +49,9 @@ export default function DashboardPage() {
       pending.length > 0 ? (pending.reduce((sum, request) => sum + request.lineItems.length, 0) / pending.length).toFixed(1) : '0';
 
     return [
-      { label: 'Total Pending Approvals', value: pending.length.toString() },
+      { label: 'TOTAL PENDING APPROVALS', value: pending.length.toString() },
       {
-        label: 'Approved This Month',
+        label: 'APPROVED THIS MONTH',
         value: formatCurrencyValue(approvedTotalsThisMonth[approvedThisMonthCurrency] ?? 0, approvedThisMonthCurrency),
         extra: (
           <select value={approvedThisMonthCurrency} onChange={(event) => setApprovedThisMonthCurrency(event.target.value as PurchaseRequest['currency'])}>
@@ -61,7 +61,7 @@ export default function DashboardPage() {
         )
       },
       {
-        label: 'Total amount approved',
+        label: 'TOTAL AMOUNT APPROVED',
         value: formatCurrencyValue(approvedValue, approvedCurrency),
         extra: (
           <select value={approvedCurrency} onChange={(event) => setApprovedCurrency(event.target.value as PurchaseRequest['currency'])}>
@@ -70,7 +70,7 @@ export default function DashboardPage() {
           </select>
         )
       },
-      { label: 'Average Line Items', value: `${avgLineItems} items` }
+      { label: 'AVERAGE LINE ITEMS', value: `${avgLineItems} ITEMS` }
     ];
   }, [requests, approvedCurrency, approvedThisMonthCurrency]);
 
@@ -112,8 +112,8 @@ export default function DashboardPage() {
   return (
     <section>
       <header>
-        <h2>Dashboard</h2>
-        <p>Logged in as {user?.name} ({user?.role.replaceAll('_', ' ')}).</p>
+        <h2>DASHBOARD</h2>
+        <p>LOGGED IN AS {user?.name?.toUpperCase()} ({user ? user.role.replaceAll('_', ' ').toUpperCase() : ''}).</p>
       </header>
 
       {loading && <p className="hint">Loading...</p>}
@@ -130,20 +130,20 @@ export default function DashboardPage() {
       </div>
 
       <section className="table-section">
-        <h3>Recent Requests</h3>
+        <h3>RECENT REQUESTS</h3>
         <table>
           <thead>
             <tr>
-              <th>Number</th>
-              <th>Description</th>
-              <th>Requested On</th>
-              <th>Status</th>
+              <th>NUMBER</th>
+              <th>DESCRIPTION</th>
+              <th>REQUESTED ON</th>
+              <th>STATUS</th>
             </tr>
           </thead>
           <tbody>
             {lastRequests.length === 0 && (
               <tr>
-                <td colSpan={4}>No requests yet.</td>
+                <td colSpan={4}>NO REQUESTS YET.</td>
               </tr>
             )}
             {lastRequests.map((request) => (
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                 <td>{request.requestNumber}</td>
                 <td>{request.serviceDescription}</td>
                 <td>{new Date(request.requestedAt).toLocaleDateString()}</td>
-                <td>{request.status.replaceAll('_', ' ')}</td>
+                <td>{request.status.replaceAll('_', ' ').toUpperCase()}</td>
               </tr>
             ))}
           </tbody>
@@ -172,25 +172,25 @@ export default function DashboardPage() {
 
       {pendingApprovals.length > 0 && (
         <section className="table-section">
-          <h3>Pending Approvals</h3>
+          <h3>PENDING APPROVALS</h3>
           <div className="card-grid">
             {pendingApprovals.map((request) => {
               const requestId = getRequestObjectId(request);
               const commentKey = requestId || request.requestNumber;
               return (
                 <article key={commentKey} className="card">
-                <header>
-                  <h3>{request.projectName ?? `${request.department} Request`}</h3>
-                  <p>{request.requestNumber}</p>
-                  <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
-                </header>
-                <p className="amount">
-                  {request.currency} {calculateTotal(request).toLocaleString()}
-                </p>
-                <p className="status">Current stage: {request.status.replaceAll('_', ')')}</p>
+                  <header>
+                    <h3>{request.projectName ?? `${request.department} Request`}</h3>
+                    <p>{request.requestNumber}</p>
+                    <p className="hint">Vendor: {request.vendorType === 'new' ? 'NEW' : 'EXISTING'}</p>
+                  </header>
+                  <p className="amount">
+                    {request.currency} {calculateTotal(request).toLocaleString()}
+                  </p>
+                  <p className="status">CURRENT STAGE: {request.status.replaceAll('_', ' ').toUpperCase()}</p>
                 {request.attachments.length > 0 && (
                   <div className="attachment-list">
-                    <p className="hint">Attachments</p>
+                    <p className="hint">ATTACHMENTS</p>
                     <ul>
                       {request.attachments.map((attachment) => (
                         <li key={attachment.id}>
@@ -209,7 +209,7 @@ export default function DashboardPage() {
                 )}
                 <textarea
                   rows={2}
-                  placeholder="Add rejection comment..."
+                  placeholder="ADD REJECTION COMMENT..."
                   value={approvalComments[commentKey] ?? ''}
                   onChange={(event) => setApprovalComments((prev) => ({ ...prev, [commentKey]: event.target.value }))}
                 />
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                     disabled={actionLoading === `${requestId}-approved`}
                     onClick={() => handleApprovalDecision(request, 'approved')}
                   >
-                    {actionLoading === `${requestId}-approved` ? 'Saving...' : 'Approve'}
+                    {actionLoading === `${requestId}-approved` ? 'SAVING...' : 'APPROVE'}
                   </button>
                   <button
                     type="button"
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                     disabled={actionLoading === `${requestId}-rejected`}
                     onClick={() => handleApprovalDecision(request, 'rejected')}
                   >
-                    {actionLoading === `${requestId}-rejected` ? 'Rejecting...' : 'Reject'}
+                    {actionLoading === `${requestId}-rejected` ? 'REJECTING...' : 'REJECT'}
                   </button>
                 </div>
               </article>
@@ -242,36 +242,36 @@ export default function DashboardPage() {
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
             <header className="modal-header">
               <div>
-                <p className="hint">Request Number</p>
+                <p className="hint">REQUEST NUMBER</p>
                 <h3>{selectedRequest.requestNumber}</h3>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedRequest(null)}>
-                Close
+                CLOSE
               </button>
             </header>
             <div className="modal-body">
               <p>
-                <strong>Department:</strong> {selectedRequest.department}
+                <strong>DEPARTMENT:</strong> {selectedRequest.department}
               </p>
               <p>
-                <strong>Vendor:</strong> {selectedRequest.vendorType === 'new' ? 'New' : 'Existing'}
+                <strong>VENDOR:</strong> {selectedRequest.vendorType === 'new' ? 'NEW' : 'EXISTING'}
               </p>
               <p>
-                <strong>Description:</strong> {selectedRequest.serviceDescription}
+                <strong>DESCRIPTION:</strong> {selectedRequest.serviceDescription}
               </p>
               <p>
-                <strong>Document Type:</strong> {selectedRequest.documentType}
+                <strong>DOCUMENT TYPE:</strong> {selectedRequest.documentType.toUpperCase()}
               </p>
 
-              <h4>Line Items</h4>
+              <h4>LINE ITEMS</h4>
               <table>
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Description</th>
-                    <th>Unit Price</th>
-                    <th>Quantity</th>
-                    <th>Cost</th>
+                    <th>DESCRIPTION</th>
+                    <th>UNIT PRICE</th>
+                    <th>QUANTITY</th>
+                    <th>COST</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={4}>Total</td>
+                    <td colSpan={4}>TOTAL</td>
                     <td>
                       {selectedRequest.currency} {calculateTotal(selectedRequest).toLocaleString()}
                     </td>
@@ -301,7 +301,7 @@ export default function DashboardPage() {
 
               {selectedRequest.attachments.length > 0 && (
                 <>
-                  <h4>Attachments</h4>
+                  <h4>ATTACHMENTS</h4>
                   <ul>
                     {selectedRequest.attachments.map((attachment) => (
                       <li key={attachment.id}>
