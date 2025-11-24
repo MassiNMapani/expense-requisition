@@ -3,9 +3,9 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard' },
-  { path: '/', label: 'New Request' },
-  { path: '/requests', label: 'Approvals' }
+  { path: '/dashboard', label: 'DASHBOARD' },
+  { path: '/', label: 'NEW REQUEST' },
+  { path: '/requests', label: 'APPROVALS' }
 ];
 
 export default function AppLayout() {

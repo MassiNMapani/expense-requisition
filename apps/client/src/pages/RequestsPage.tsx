@@ -10,6 +10,7 @@ const statusOrder: RequestStatus[] = ['submitted', 'hod_review', 'cfo_review', '
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -105,6 +106,17 @@ export default function RequestsPage() {
     return { active, finished };
   }, [requests]);
 
+  function formatPrNumber(raw: string) {
+    // If already PR- followed by digits, return as-is; if PR-UUID or full UUID, attempt to extract trailing digits
+    const match = raw.match(/PR-(\d+)$/);
+    if (match) return `PR-${match[1].padStart(6, '0')}`;
+    // if raw contains PR-uuid, try to map numeric sequence from database id portion (fallback)
+    const digits = raw.replace(/[^0-9]/g, '');
+    if (digits.length > 0) return `PR-${digits.slice(-6).padStart(6, '0')}`;
+    // fallback: show original
+    return raw;
+  }
+
   if (loading) {
     return <div className="page-loading">Loading requests...</div>;
   }
@@ -112,111 +124,118 @@ export default function RequestsPage() {
   return (
     <section>
       <header>
-        <h2>Approval Pipeline</h2>
-        <p>Track the lifecycle of every purchase request across all approvers.</p>
+        <h2>APPROVAL PIPELINE</h2>
+        <p>TRACK THE LIFECYCLE OF EVERY PURCHASE REQUEST ACROSS ALL APPROVERS.</p>
       </header>
 
       {error && <p className="error-text">{error}</p>}
 
-      <h3 className="section-title">My Active Requests</h3>
+  <h3 className="section-title">MY ACTIVE REQUESTS</h3>
       {grouped.active.length === 0 ? (
         <p className="hint">No active requests.</p>
       ) : (
-        <div className="card-grid">
-          {grouped.active.map((request) => {
-            const title = request.projectName ?? `${request.department} Request`;
-            const requestId = requestIdentifier(request);
-            return (
-              <article key={requestId} className="card">
-                <header>
-                  <h3>{title}</h3>
-                  <p>{request.requestNumber}</p>
-                  <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
-                </header>
-                <p className="amount">
-                  {request.currency} {calculateTotal(request).toLocaleString()}
-                </p>
-                <p className="status">Current stage: {formatStatus(request.status)}</p>
-                {request.attachments.length > 0 && (
-                  <div className="attachment-list">
-                    <p className="hint">Attachments</p>
-                    <ul>
-                      {request.attachments.map((attachment) => (
-                        <li key={attachment.id}>
-                          <a
-                            href={buildFileUrl(`/uploads/${attachment.filename}`)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={attachment.originalName ?? attachment.filename}
-                          >
-                            {attachment.originalName ?? attachment.filename}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-              <ol className="status-track">
-                {statusOrder.map((status) => {
-                  const position = statusOrder.indexOf(status);
-                  const current = Math.max(statusOrder.indexOf(request.status), 0);
-                  return (
-                    <li key={status} className={position <= current ? 'complete' : ''}>
-                      {formatStatus(status)}
-                    </li>
-                  );
-                })}
-              </ol>
-
-              {user && canRoleApprove(request, user.role) && (
-                <div className="approval-actions">
-                  <textarea
-                    rows={2}
-                    placeholder="Add context for approvers..."
-                    value={comments[requestId] ?? ''}
-                    onChange={(event) => setComments((prev) => ({ ...prev, [requestId]: event.target.value }))}
-                  />
-                  <div className="actions-row">
-                    <button type="button" disabled={actionLoading === `${requestId}-approved`} onClick={() => handleDecision(requestId, 'approved')}>
-                      {actionLoading === `${requestId}-approved` ? 'Saving...' : 'Approve'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost"
-                      disabled={actionLoading === `${requestId}-rejected`}
-                      onClick={() => handleDecision(requestId, 'rejected')}
-                    >
-                      {actionLoading === `${requestId}-rejected` ? 'Rejecting...' : 'Reject'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {user?.role === 'accounting_analyst' && request.accountingSteps.length > 0 && (
-                <div className="accounting-steps">
-                  {request.accountingSteps.map((step) => (
-                    <label key={step.id} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={(processingSelections[requestId] ?? []).includes(step.id)}
-                        onChange={(event) => toggleStep(requestId, step.id, event.target.checked)}
-                      />
-                      {step.label}
-                    </label>
-                  ))}
-                  <button type="button" onClick={() => handleProcessingSave(requestId)} disabled={processingLoading === requestId}>
-                    {processingLoading === requestId ? 'Updating...' : 'Save processing'}
+        <div className="request-list">
+          <ul>
+            {grouped.active.map((request) => {
+              const title = request.projectName ?? `${request.department} Request`;
+              const requestId = requestIdentifier(request);
+              return (
+                <li key={requestId} className={`request-summary ${selectedRequestId === requestId ? 'selected' : ''}`}>
+                  <button type="button" className="link-like" onClick={() => setSelectedRequestId(requestId)}>
+                    <div className="summary-left">
+                      <strong>{title}</strong>
+                      <div className="hint">{formatPrNumber(request.requestNumber)}</div>
+                    </div>
+                    <div className="summary-right">
+                      <div className="amount">{request.currency} {calculateTotal(request).toLocaleString()}</div>
+                      <div className="status">{formatStatus(request.status)}</div>
+                    </div>
                   </button>
-                </div>
-              )}
-              </article>
-            );
-          })}
+                  {selectedRequestId === requestId && (
+                    <div className="request-detail">
+                      <p className="hint">Vendor: {request.vendorType === 'new' ? 'New' : 'Existing'}</p>
+                      {request.attachments.length > 0 && (
+                        <div className="attachment-list">
+                          <p className="hint">Attachments</p>
+                          <ul>
+                            {request.attachments.map((attachment) => (
+                              <li key={attachment.id}>
+                                <a
+                                  href={buildFileUrl(`/uploads/${attachment.filename}`)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download={attachment.originalName ?? attachment.filename}
+                                >
+                                  {attachment.originalName ?? attachment.filename}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <ol className="status-track">
+                        {statusOrder.map((status) => {
+                          const position = statusOrder.indexOf(status);
+                          const current = Math.max(statusOrder.indexOf(request.status), 0);
+                          return (
+                            <li key={status} className={position <= current ? 'complete' : ''}>
+                              {formatStatus(status)}
+                            </li>
+                          );
+                        })}
+                      </ol>
+
+                      {user && canRoleApprove(request, user.role) && (
+                        <div className="approval-actions">
+                          <textarea
+                            rows={2}
+                            placeholder="Add context for approvers..."
+                            value={comments[requestId] ?? ''}
+                            onChange={(event) => setComments((prev) => ({ ...prev, [requestId]: event.target.value }))}
+                          />
+                          <div className="actions-row">
+                            <button type="button" disabled={actionLoading === `${requestId}-approved`} onClick={() => handleDecision(requestId, 'approved')}>
+                              {actionLoading === `${requestId}-approved` ? 'Saving...' : 'Approve'}
+                            </button>
+                            <button
+                              type="button"
+                              /* show Reject with primary styling to match Approve */
+                              disabled={actionLoading === `${requestId}-rejected`}
+                              onClick={() => handleDecision(requestId, 'rejected')}
+                            >
+                              {actionLoading === `${requestId}-rejected` ? 'Rejecting...' : 'Reject'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {user?.role === 'accounting_analyst' && request.accountingSteps.length > 0 && (
+                        <div className="accounting-steps">
+                          {request.accountingSteps.map((step) => (
+                            <label key={step.id} className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={(processingSelections[requestId] ?? []).includes(step.id)}
+                                onChange={(event) => toggleStep(requestId, step.id, event.target.checked)}
+                              />
+                              {step.label}
+                            </label>
+                          ))}
+                          <button type="button" onClick={() => handleProcessingSave(requestId)} disabled={processingLoading === requestId}>
+                            {processingLoading === requestId ? 'Updating...' : 'Save processing'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
-      <h3 className="section-title">My Past Requests</h3>
+  <h3 className="section-title">MY PAST REQUESTS</h3>
       <div className="table-section">
         <table>
           <thead>
@@ -235,7 +254,7 @@ export default function RequestsPage() {
             )}
             {grouped.finished.map((request) => (
               <tr key={requestIdentifier(request)}>
-                <td>{request.requestNumber}</td>
+                <td>{formatPrNumber(request.requestNumber)}</td>
                 <td>{request.serviceDescription}</td>
                 <td>{new Date(request.requestedAt).toLocaleDateString()}</td>
                 <td>
