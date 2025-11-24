@@ -33,7 +33,7 @@ export default function RequestFormPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const showProjectFields = useMemo(
-    () => ['Generation and Transmission', 'Transmission and Distribution'].includes(draft.department),
+    () => ['Generation and Transmission', 'Transmission and Distribution', 'Environment'].includes(draft.department),
     [draft.department]
   );
   const isNewVendor = draft.vendorType === 'new';
@@ -47,7 +47,7 @@ export default function RequestFormPage() {
   );
 
   const requestorDepartments = useMemo(
-    () => ['Generation and Transmission', 'Transmission and Distribution'],
+    () => ['Generation and Transmission', 'Transmission and Distribution', 'Environment'],
     []
   );
 
@@ -71,8 +71,13 @@ export default function RequestFormPage() {
     setDraft((prev) => {
       const next = [...prev.lineItems];
       const isNumericField = field === 'unitPrice' || field === 'quantity';
-      const parsedValue = isNumericField ? Number(value) || 0 : value;
-      next[index] = { ...next[index], [field]: parsedValue };
+      if (isNumericField) {
+        const parsedValue = Number(value);
+        const safeValue = Number.isNaN(parsedValue) ? 0 : Math.max(0, parsedValue);
+        next[index] = { ...next[index], [field]: safeValue };
+      } else {
+        next[index] = { ...next[index], [field]: value };
+      }
       return { ...prev, lineItems: next };
     });
   }
@@ -319,23 +324,23 @@ export default function RequestFormPage() {
                       />
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        inputMode="decimal"
-                        placeholder="0"
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      inputMode="decimal"
+                      placeholder="0"
                         value={item.unitPrice === 0 ? '' : item.unitPrice}
                         onChange={(event) => updateLineItem(index, 'unitPrice', event.target.value)}
                       />
                     </td>
                     <td>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(event) => updateLineItem(index, 'quantity', event.target.value)}
-                      />
+                    <input
+                      type="number"
+                      min={0}
+                      value={item.quantity === 0 ? '' : item.quantity}
+                      onChange={(event) => updateLineItem(index, 'quantity', event.target.value)}
+                    />
                     </td>
                     <td>
                       {draft.currency} {(item.unitPrice * item.quantity).toLocaleString()}

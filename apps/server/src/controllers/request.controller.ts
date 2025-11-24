@@ -84,7 +84,7 @@ export async function createRequest(req: Request, res: Response) {
       return res.status(400).json({ message: 'Invalid currency' });
     }
 
-    const allowedDepartments: string[] = ['Generation and Transmission', 'Transmission and Distribution'];
+    const allowedDepartments: string[] = ['Generation and Transmission', 'Transmission and Distribution', 'Environment'];
     const enforcedDepartment = req.user.departmentId ?? department;
 
     if (req.user.role === Roles.REQUESTOR) {
@@ -138,10 +138,12 @@ export async function createRequest(req: Request, res: Response) {
         (item) =>
           !item.description ||
           Number.isNaN(item.unitPrice) ||
-          Number.isNaN(item.quantity)
+          Number.isNaN(item.quantity) ||
+          item.unitPrice < 0 ||
+          item.quantity < 0
       )
     ) {
-      return res.status(400).json({ message: 'Invalid line item values' });
+      return res.status(400).json({ message: 'Invalid line item values. Unit price and quantity cannot be negative.' });
     }
 
     const parsedContract = contractDetailsRaw ? JSON.parse(contractDetailsRaw) : undefined;
