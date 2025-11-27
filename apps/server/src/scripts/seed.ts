@@ -18,7 +18,7 @@ async function seed() {
       role: Roles.REQUESTOR
     },
     {
-      name: 'Laura Mwandemena',
+      name: 'Laura Chongo',
       employeeId: 'KAN010',
       email: 'laura@kanonapower.com',
       departmentId: 'Finance',
@@ -72,13 +72,6 @@ async function seed() {
       email: 'mwiza@kanonapower.com',
       departmentId: 'Commercial',
       role: Roles.REQUESTOR
-    },
-    {
-      name: 'John Simachembele',
-      employeeId: 'KAN025',
-      email: 'john@kanonapower.com',
-      departmentId: 'Human Resource and Adminstration',
-      role: Roles.HOD
     },
     {
       name: 'John Simachembele',
@@ -211,7 +204,7 @@ async function seed() {
       role: Roles.CFO
     },
     {
-      name: 'Tito Mwandemena',
+      name: 'Tito Chongo',
       employeeId: 'KAN042',
       email: 'tito@kanonapower.com',
       departmentId: 'Legal',
