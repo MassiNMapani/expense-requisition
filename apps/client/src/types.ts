@@ -1,6 +1,19 @@
-import type { PurchaseRequestPayload } from '@expense-requisition/shared';
+import type {
+  PurchaseRequest as SharedPurchaseRequest,
+  PurchaseRequestPayload,
+  UserRole,
+  DocumentType,
+  RequestStatus,
+  LineItem,
+  AccountingStep
+} from '@expense-requisition/shared';
 
-export type { UserRole, DocumentType, RequestStatus, LineItem, PurchaseRequest, AccountingStep } from '@expense-requisition/shared';
+export type PurchaseRequest = SharedPurchaseRequest & {
+  loadedByAnalystId?: string;
+  loadedByAnalystName?: string;
+};
+
+export type { UserRole, DocumentType, RequestStatus, LineItem, AccountingStep };
 
 export type ClientPurchaseRequestDraft = PurchaseRequestPayload & {
   localFiles: File[];

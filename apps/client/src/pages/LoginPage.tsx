@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [employeeId, setEmployeeId] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const response = await login(employeeId, password);
+      const response = await login(email, password);
       if (response.requiresPasswordChange) {
         navigate('/change-password');
       } else {
@@ -39,8 +39,8 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <label>
-            Employee ID
-            <input value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} placeholder="Enter your employee ID" />
+            Email
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Enter your email" />
           </label>
 
           <label>

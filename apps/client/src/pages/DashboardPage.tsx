@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiFetch, buildFileUrl } from '../lib/api';
+import { apiFetch, apiFetchBlob } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import type { PurchaseRequest } from '../types';
 import { canRoleApprove } from '../utils/approvals';
@@ -16,6 +16,11 @@ export default function DashboardPage() {
   const [approvedCurrency, setApprovedCurrency] = useState<PurchaseRequest['currency']>('ZMW');
   const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
   const [approvedThisMonthCurrency, setApprovedThisMonthCurrency] = useState<PurchaseRequest['currency']>('ZMW');
+  const [viewingAttachmentId, setViewingAttachmentId] = useState<string | null>(null);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string | null>(null);
+  const canDownloadAttachment = user?.role === 'accounting_analyst' || user?.role === 'chief_finance_officer';
 
   useEffect(() => {
     refresh();
@@ -115,6 +120,50 @@ export default function DashboardPage() {
     } finally {
       setActionLoading(null);
     }
+  }
+
+  async function viewAttachment(attachment: { id: string; filename: string }) {
+    setViewingAttachmentId(attachment.id);
+    try {
+      const blob = await apiFetchBlob(`/uploads/${attachment.filename}`);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setPreviewName(attachment.filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to open attachment');
+    } finally {
+      setViewingAttachmentId(null);
+    }
+  }
+
+  async function downloadAttachment(attachment: { id: string; filename: string; originalName?: string }) {
+    setDownloadingAttachmentId(attachment.id);
+    try {
+      const blob = await apiFetchBlob(`/uploads/${attachment.filename}?download=true`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.originalName ?? attachment.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to download attachment');
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  }
+
+  function closePreview() {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setPreviewName(null);
   }
 
   return (
@@ -273,14 +322,27 @@ export default function DashboardPage() {
                   <ul>
                     {selectedRequest.attachments.map((attachment) => (
                       <li key={attachment.id}>
-                        <a
-                          href={buildFileUrl(`/uploads/${attachment.filename}`)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={attachment.originalName ?? attachment.filename}
-                        >
-                          {attachment.originalName ?? attachment.filename}
-                        </a>
+                        <div className="attachment-row">
+                          <span>{attachment.originalName ?? attachment.filename}</span>
+                          <div className="attachment-actions">
+                            <button
+                              type="button"
+                              onClick={() => viewAttachment(attachment)}
+                              disabled={viewingAttachmentId === attachment.id}
+                            >
+                              {viewingAttachmentId === attachment.id ? 'Opening...' : 'View'}
+                            </button>
+                            {canDownloadAttachment && (
+                              <button
+                                type="button"
+                                onClick={() => downloadAttachment(attachment)}
+                                disabled={downloadingAttachmentId === attachment.id}
+                              >
+                                {downloadingAttachmentId === attachment.id ? 'Downloading...' : 'Download'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -313,6 +375,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {previewUrl && (
+        <div className="modal-backdrop" onClick={closePreview}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <header className="modal-header">
+              <div>
+                <p className="hint">Attachment</p>
+                <h4>{previewName ?? 'Preview'}</h4>
+              </div>
+              <button type="button" className="ghost" onClick={closePreview}>
+                Close
+              </button>
+            </header>
+            <div className="modal-body">
+              <iframe src={previewUrl} title={previewName ?? 'Attachment'} style={{ width: '100%', height: '70vh' }} />
+              <p className="hint">Viewing only. Downloads are restricted based on role.</p>
             </div>
           </div>
         </div>

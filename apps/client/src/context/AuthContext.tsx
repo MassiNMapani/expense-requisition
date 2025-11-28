@@ -8,6 +8,7 @@ interface AuthUser {
   id: string;
   name: string;
   employeeId: string;
+  email?: string;
   role: UserRole;
   departmentId?: string;
 }
@@ -23,7 +24,7 @@ interface AuthContextValue {
   token: string | null;
   requiresPasswordChange: boolean;
   loading: boolean;
-  login: (employeeId: string, password: string) => Promise<LoginResponse>;
+  login: (email: string, password: string) => Promise<LoginResponse>;
   logout: () => void;
   markPasswordChanged: () => void;
 }
@@ -65,10 +66,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     token,
     requiresPasswordChange,
     loading,
-    login: async (employeeId: string, password: string) => {
+    login: async (email: string, password: string) => {
       const response = await apiFetch<LoginResponse>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ employeeId, password })
+        body: JSON.stringify({ email, password })
       });
 
       setUser(response.user);

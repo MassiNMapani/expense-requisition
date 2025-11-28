@@ -12,3 +12,4 @@ packages/
 apps/server/src/scripts/seed.ts
 .vscode/
 openai.chatgpt-0.4.44.vsix
+apps/server/uploads/

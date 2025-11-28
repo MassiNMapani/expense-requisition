@@ -15,6 +15,7 @@ import {
 } from '@expense-requisition/shared';
 
 import { PurchaseRequestModel } from '../models/PurchaseRequest';
+import { UserModel } from '../models/User';
 import type { PurchaseRequestDocument } from '../models/PurchaseRequest';
 
 function getInitialStatus(role: string): RequestStatus {
@@ -199,8 +200,48 @@ export async function listRequests(req: Request, res: Response) {
       break;
   }
 
-  const requests = await PurchaseRequestModel.find(query).sort({ createdAt: -1 });
-  return res.json(requests);
+  const records = await PurchaseRequestModel.find(query).sort({ createdAt: -1 });
+  const serialized = records.map((record) => record.toObject({ virtuals: true }));
+
+  const analystIds = new Set<string>();
+
+  serialized.forEach((request) => {
+    if (request.status === RequestStatuses.BANK_LOADED) {
+      if (!request.loadedByAnalystId) {
+        const completedStep = [...(request.accountingSteps ?? [])]
+          .reverse()
+          .find((step) => step.completedBy);
+
+        if (completedStep?.completedBy) {
+          request.loadedByAnalystId = completedStep.completedBy;
+        }
+      }
+
+      if (request.loadedByAnalystId) {
+        analystIds.add(request.loadedByAnalystId.toString());
+      }
+    }
+  });
+
+  if (analystIds.size > 0) {
+    const analysts = await UserModel.find({ _id: { $in: Array.from(analystIds) } })
+      .select(['name'])
+      .lean();
+    const analystNameMap = new Map<string, string>(
+      analysts.map((analyst) => [analyst._id.toString(), analyst.name])
+    );
+
+    serialized.forEach((request) => {
+      if (request.loadedByAnalystId && !request.loadedByAnalystName) {
+        const name = analystNameMap.get(request.loadedByAnalystId.toString());
+        if (name) {
+          request.loadedByAnalystName = name;
+        }
+      }
+    });
+  }
+
+  return res.json(serialized);
 }
 
 export async function getRequest(req: Request, res: Response) {
@@ -253,6 +294,17 @@ export async function updateRequestStatus(req: Request, res: Response) {
     record.status = record.accountingSteps.every((step) => step.completed)
       ? RequestStatuses.BANK_LOADED
       : RequestStatuses.ACCOUNTING;
+
+    if (record.status === RequestStatuses.BANK_LOADED) {
+      record.loadedByAnalystId = req.user.id;
+      const analyst = await UserModel.findById(req.user.id);
+      if (analyst?.name) {
+        record.loadedByAnalystName = analyst.name;
+      }
+    } else {
+      delete record.loadedByAnalystId;
+      delete record.loadedByAnalystName;
+    }
 
     const analystHistory: {
       stage: RequestStatus;
