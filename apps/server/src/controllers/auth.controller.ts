@@ -7,13 +7,15 @@ import { comparePassword, hashPassword } from '../utils/password';
 import { logger } from '../lib/logger';
 
 export async function login(req: Request, res: Response) {
-  const { employeeId, password } = req.body as { employeeId?: string; password?: string };
+  const { email, password } = req.body as { email?: string; password?: string };
 
-  if (!employeeId || !password) {
-    return res.status(400).json({ message: 'Employee ID and password are required' });
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
   }
 
-  const user = await UserModel.findOne({ employeeId });
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const user = await UserModel.findOne({ email: normalizedEmail });
 
   if (!user) {
     return res.status(401).json({ message: 'Invalid credentials' });
@@ -40,6 +42,7 @@ export async function login(req: Request, res: Response) {
     user: {
       id: user.id,
       name: user.name,
+      email: user.email,
       employeeId: user.employeeId,
       role: user.role,
       departmentId: user.departmentId

@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/api';
-const FILE_BASE_URL = import.meta.env.VITE_FILE_BASE_URL ?? API_BASE_URL.replace(/\/api$/, '');
+const FILE_BASE_URL = import.meta.env.VITE_FILE_BASE_URL ?? API_BASE_URL;
 
 let authToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('expense-auth-token') : null;
 
@@ -36,6 +36,26 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   return (await response.json()) as T;
+}
+
+export async function apiFetchBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  const headers = new Headers(options.headers ?? {});
+
+  if (authToken) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers
+  });
+
+  if (!response.ok) {
+    const message = await parseError(response);
+    throw new Error(message);
+  }
+
+  return await response.blob();
 }
 
 async function parseError(response: Response) {

@@ -47,6 +47,8 @@ export interface PurchaseRequestDocument extends Document {
     comment?: string;
     actedAt: Date;
   }[];
+  loadedByAnalystId?: string;
+  loadedByAnalystName?: string;
   accountingSteps: AccountingStepDocument[];
   createdAt: Date;
   updatedAt: Date;
@@ -119,6 +121,8 @@ const purchaseRequestSchema = new Schema<PurchaseRequestDocument>(
     },
     status: { type: String, required: true },
     approvalHistory: [approvalHistorySchema],
+    loadedByAnalystId: String,
+    loadedByAnalystName: String,
     accountingSteps: [accountingStepSchema]
   },
   { timestamps: true }
